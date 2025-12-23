@@ -6,7 +6,7 @@ import { TacticsBoard } from './components/TacticsBoard';
 import { SquadSelection } from './components/SquadSelection';
 import { StatsView } from './components/StatsView';
 import { Scoreboard } from './components/Scoreboard';
-import { Lock, Eye, ShieldCheck, LogIn, Wifi, WifiOff, Loader2, RefreshCw, AlertCircle, HardDrive, Database, Copy, Check, X } from 'lucide-react';
+import { Lock, Eye, ShieldCheck, LogIn, Wifi, WifiOff, Loader2, RefreshCw, AlertCircle, HardDrive, Database, Copy, Check, X, AlertTriangle } from 'lucide-react';
 import { supabase, MATCH_ID, checkConnection } from './services/supabase';
 
 const App: React.FC = () => {
@@ -104,6 +104,7 @@ const App: React.FC = () => {
           // Se falhar a verificação, assumimos modo local/offline
           setIsSynced(true);
           setIsConnected(false);
+          setConnectionError(check.message || 'Erro desconhecido');
           setIsCheckingConnection(false);
           return;
       }
@@ -121,7 +122,8 @@ const App: React.FC = () => {
         setIsConnected(true);
       } else if (error) {
         console.error("Erro ao carregar dados:", error);
-        setIsConnected(false);
+        // Se a tabela existe mas está vazia ou erro de row
+        setIsConnected(true); 
         setIsSynced(true);
       } else {
         setIsConnected(true);
@@ -423,14 +425,20 @@ insert into match_data (id, content) values ('live_match', '{}');`;
                     
                     <div className="space-y-4 text-sm text-gray-600">
                         <div className="bg-red-50 p-4 rounded-lg border border-red-100 text-red-800">
-                            <strong>Estado: Offline</strong>
-                            <p className="mt-1">A aplicação não conseguiu ligar ao servidor. Isto pode acontecer se as chaves da base de dados não estiverem configuradas.</p>
+                            <strong>Estado: {isConnected ? 'Online' : 'Offline'}</strong>
+                            {connectionError && (
+                                <p className="mt-1 font-mono text-xs bg-red-100 p-1 rounded text-red-900 border border-red-200">
+                                    {connectionError}
+                                </p>
+                            )}
+                            <p className="mt-2 text-xs">
+                                Se o erro for "Falta criar a Tabela", copia o código abaixo e corre no SQL Editor do Supabase.
+                            </p>
                         </div>
 
                         <ol className="list-decimal ml-5 space-y-4">
                             <li>
-                                <p className="font-bold text-gray-800">Se é a primeira vez:</p>
-                                <p>Crie uma base de dados no <a href="https://database.new" target="_blank" className="text-blue-600 underline">supabase.com</a> e copie o URL e a Key.</p>
+                                <p className="font-bold text-gray-800">SQL Necessário</p>
                                 <div className="bg-gray-900 text-gray-300 p-3 rounded-lg mt-2 font-mono text-xs relative group">
                                     <button onClick={copySqlToClipboard} className="absolute top-2 right-2 p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors">
                                         {copiedSql ? <Check size={14}/> : <Copy size={14}/>}
@@ -448,10 +456,6 @@ create policy "Public Access" on match_data for all using (true) with check (tru
 insert into match_data (id, content) values ('live_match', '{}');`}
                                     </pre>
                                 </div>
-                            </li>
-                            <li>
-                                <p className="font-bold text-gray-800">Onde colocar as chaves?</p>
-                                <p>Cole as chaves no ficheiro <code>services/supabase.ts</code> ou nas variáveis de ambiente da Vercel.</p>
                             </li>
                         </ol>
                     </div>
@@ -516,7 +520,9 @@ insert into match_data (id, content) values ('live_match', '{}');`}
                     ) : isConnected ? (
                         <span className="text-green-500 flex items-center gap-1"><Wifi size={12}/> Online</span>
                     ) : (
-                        <button onClick={() => setShowSetupGuide(true)} className="text-red-500 flex items-center gap-1 hover:underline hover:text-red-400 cursor-pointer"><WifiOff size={12}/> Offline (Configurar?)</button>
+                        <button onClick={() => setShowSetupGuide(true)} className="text-red-500 flex items-center gap-1 hover:underline hover:text-red-400 cursor-pointer">
+                            <AlertCircle size={12}/> {connectionError ? connectionError.slice(0, 25) + '...' : 'Offline (Ver Erro)'}
+                        </button>
                     )}
                 </div>
                 <button 
@@ -571,8 +577,15 @@ insert into match_data (id, content) values ('live_match', '{}');`}
                   <Wifi size={18} className="text-green-500" />
                 </div>
              ) : (
-                <div title="Offline (Clique para configurar)" className="cursor-pointer" onClick={() => { setAuthRole('guest'); setShowSetupGuide(true); }}>
-                  <WifiOff size={18} className="text-red-500" />
+                <div 
+                    title={connectionError}
+                    className="cursor-pointer flex items-center gap-1 bg-red-900/50 px-2 py-1 rounded border border-red-800" 
+                    onClick={() => { setAuthRole('guest'); setShowSetupGuide(true); }}
+                >
+                  <AlertTriangle size={14} className="text-red-500" />
+                  <span className="text-[10px] font-bold text-red-200 hidden sm:inline-block max-w-[100px] truncate">
+                    {connectionError || 'Offline'}
+                  </span>
                 </div>
              )}
           </div>
